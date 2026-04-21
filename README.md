@@ -248,7 +248,7 @@ MIT License — free to use, modify, and distribute.
 
 ## 👤 Author
 
-Built by **[Your Name]** — feel free to open an issue or pull request!
+Built by **Tahir Husnain** — feel free to open an issue or pull request!
 
 ---
 
