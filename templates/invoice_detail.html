@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.invoice_number }}{% endblock %}
+{% block topbar_title %}{{ invoice.invoice_number }}{% endblock %}
+{% block topbar_actions %}
+  <a href="/invoices" class="btn btn-secondary btn-sm">← All Invoices</a>
+{% endblock %}
+{% set active_nav = 'invoices' %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <div>
+      <h1 style="display:flex; align-items:center; gap:10px;">
+        {{ invoice.invoice_number }}
+        <span class="badge badge-{{ invoice.status }}">{{ invoice.status|title }}</span>
+      </h1>
+      <p>Issued {{ invoice.issue_date }} · Due {{ invoice.due_date }}</p>
+    </div>
+  </div>
+  <div class="action-bar">
+    <a href="/invoices/{{ invoice.id }}/pdf" class="btn btn-primary">↓ Download PDF</a>
+    {% if invoice.status != 'paid' %}
+    <form method="POST" action="/invoices/{{ invoice.id }}/status" style="display:inline;">
+      <input type="hidden" name="status" value="paid">
+      <button type="submit" class="btn btn-success">✓ Mark as Paid</button>
+    </form>
+    {% endif %}
+    <form method="POST" action="/invoices/{{ invoice.id }}/delete" style="display:inline;"
+      onsubmit="return confirm('Delete invoice {{ invoice.invoice_number }}? This cannot be undone.')">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start;">
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- Bill To / From -->
+    <div class="card">
+      <div class="card-body">
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h3>From</h3>
+            <p style="font-weight:600; font-size:15px; margin-bottom:4px;">{{ user.company_name }}</p>
+            {% if user.company_address %}
+              {% for line in user.company_address.split('\n') %}
+                {% if line.strip() %}<p>{{ line.strip() }}</p>{% endif %}
+              {% endfor %}
+            {% endif %}
+            {% if user.company_vat_id %}<p style="color:var(--text-muted); font-size:12.5px; margin-top:4px;">USt-IdNr.: {{ user.company_vat_id }}</p>{% endif %}
+            {% if user.company_email %}<p style="color:var(--text-muted); font-size:12.5px;">{{ user.company_email }}</p>{% endif %}
+          </div>
+          <div class="detail-section">
+            <h3>Bill To</h3>
+            <p style="font-weight:600; font-size:15px; margin-bottom:4px;">{{ invoice.customer.name }}</p>
+            {% if invoice.customer.address %}<p>{{ invoice.customer.address }}</p>{% endif %}
+            {% if invoice.customer.postal_code or invoice.customer.city %}
+              <p>{{ invoice.customer.postal_code }} {{ invoice.customer.city }}</p>
+            {% endif %}
+            {% if invoice.customer.country %}<p>{{ invoice.customer.country }}</p>{% endif %}
+            {% if invoice.customer.vat_id %}<p style="color:var(--text-muted); font-size:12.5px; margin-top:4px;">USt-IdNr.: {{ invoice.customer.vat_id }}</p>{% endif %}
+            {% if invoice.customer.email %}<p style="color:var(--text-muted); font-size:12.5px;">{{ invoice.customer.email }}</p>{% endif %}
+          </div>
+        </div>
+        {% if invoice.tax_free %}
+        <div style="background:var(--warning-bg); border:1px solid #fde68a; border-radius:7px; padding:10px 14px; font-size:13px; color:var(--warning); margin-top:12px;">
+          ⚠️ Kleinunternehmerregelung §19 UStG — Gemäß §19 UStG wird keine Umsatzsteuer berechnet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Items -->
+    <div class="card">
+      <div class="card-header"><h2>Line Items</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th style="text-align:center;">Qty</th>
+              <th style="text-align:right;">Unit Price</th>
+              <th style="text-align:center;">VAT</th>
+              <th style="text-align:right;">Net Total</th>
+              <th style="text-align:right;">VAT Amt</th>
+              <th style="text-align:right;">Gross</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in invoice.items %}
+            <tr>
+              <td>{{ item.description }}</td>
+              <td style="text-align:center; color:var(--text-muted);">{{ item.quantity|int if item.quantity == item.quantity|int else item.quantity }}</td>
+              <td style="text-align:right;" class="td-mono">€{{ "%.2f"|format(item.unit_price) }}</td>
+              <td style="text-align:center;">
+                <span style="font-size:11.5px; color:var(--text-muted);">
+                  {% if invoice.tax_free %}0%{% else %}{{ item.vat_rate }}%{% endif %}
+                </span>
+              </td>
+              <td style="text-align:right;" class="td-mono">€{{ "%.2f"|format(item.line_total) }}</td>
+              <td style="text-align:right;" class="td-mono" style="color:var(--text-muted);">€{{ "%.2f"|format(item.vat_amount) }}</td>
+              <td style="text-align:right;" class="td-mono" style="font-weight:600;">€{{ "%.2f"|format(item.line_total + item.vat_amount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if invoice.notes %}
+    <div class="card">
+      <div class="card-header"><h2>Notes</h2></div>
+      <div class="card-body" style="color:var(--text-muted); font-size:13.5px; white-space:pre-line;">{{ invoice.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right sidebar -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div class="card">
+      <div class="card-header"><h2>Totals</h2></div>
+      <div class="card-body">
+        <div class="totals-box">
+          <div class="totals-row">
+            <span class="totals-label">Subtotal (net)</span>
+            <span class="totals-value">€{{ "%.2f"|format(invoice.subtotal) }}</span>
+          </div>
+          {% if invoice.tax_free %}
+          <div class="totals-row">
+            <span class="totals-label" style="font-size:12px;">§19 UStG — No VAT</span>
+            <span class="totals-value">€0.00</span>
+          </div>
+          {% else %}
+          <div class="totals-row">
+            <span class="totals-label">VAT</span>
+            <span class="totals-value">€{{ "%.2f"|format(invoice.vat_amount) }}</span>
+          </div>
+          {% endif %}
+          <div class="totals-row total-grand">
+            <span>Total (EUR)</span>
+            <span class="totals-value">€{{ "%.2f"|format(invoice.total) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Update Status</h2></div>
+      <div class="card-body" style="display:flex; flex-direction:column; gap:8px;">
+        {% for s in ['paid', 'pending', 'unpaid'] %}
+        <form method="POST" action="/invoices/{{ invoice.id }}/status">
+          <input type="hidden" name="status" value="{{ s }}">
+          <button type="submit" class="btn {% if invoice.status == s %}btn-{{ 'success' if s == 'paid' else ('pending' if s == 'pending' else 'danger') }}{% else %}btn-secondary{% endif %}"
+            style="width:100%; justify-content:center; {% if invoice.status == s %}font-weight:600;{% endif %}">
+            {% if invoice.status == s %}✓ {% endif %}{{ s|title }}
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Actions</h2></div>
+      <div class="card-body" style="display:flex; flex-direction:column; gap:8px;">
+        <a href="/invoices/{{ invoice.id }}/pdf" class="btn btn-primary" style="justify-content:center;">↓ Download PDF</a>
+        <a href="/customers/{{ invoice.customer_id }}/edit" class="btn btn-secondary" style="justify-content:center;">Edit Customer</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.btn-pending { background: var(--pending-bg); color: var(--pending); border: 1px solid #ddd6fe; }
+</style>
+{% endblock %}

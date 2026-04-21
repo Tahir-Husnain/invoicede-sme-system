@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block topbar_title %}Financial Reports{% endblock %}
+{% block topbar_actions %}
+  <a href="/reports/export/csv" class="btn btn-secondary btn-sm">↓ Export CSV</a>
+{% endblock %}
+{% set active_nav = 'reports' %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Financial Reports</h1>
+    <p>Revenue summary for {{ year }}</p>
+  </div>
+  <form method="GET" style="display:flex; gap:8px; align-items:center;">
+    <select name="year" class="form-control" style="width:auto;" onchange="this.form.submit()">
+      {% for y in available_years %}
+      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<!-- Summary stats -->
+<div class="stats-grid" style="margin-bottom:24px;">
+  <div class="stat-card stat-accent">
+    <div class="stat-label">Gross Revenue</div>
+    <div class="stat-value" style="font-size:22px;">€{{ "%.0f"|format(total_gross) }}</div>
+    <div class="stat-sub">Including VAT</div>
+  </div>
+  <div class="stat-card stat-success">
+    <div class="stat-label">Net Revenue</div>
+    <div class="stat-value" style="font-size:22px;">€{{ "%.0f"|format(total_revenue) }}</div>
+    <div class="stat-sub">Excl. VAT</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">VAT Collected</div>
+    <div class="stat-value" style="font-size:22px;">€{{ "%.0f"|format(total_vat) }}</div>
+    <div class="stat-sub">Umsatzsteuer</div>
+  </div>
+  <div class="stat-card stat-warning">
+    <div class="stat-label">Outstanding</div>
+    <div class="stat-value" style="font-size:22px;">€{{ "%.0f"|format(unpaid_total) }}</div>
+    <div class="stat-sub">{{ unpaid_count }} unpaid invoices</div>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start;">
+
+  <!-- Chart card -->
+  <div class="card">
+    <div class="card-header"><h2>Monthly Revenue — {{ year }}</h2></div>
+    <div class="card-body">
+      <canvas id="revenueChart" height="240"></canvas>
+    </div>
+  </div>
+
+  <!-- Paid vs Unpaid -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div class="card">
+      <div class="card-header"><h2>Payment Overview</h2></div>
+      <div class="card-body">
+        <canvas id="statusChart" height="200"></canvas>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <span style="display:flex; align-items:center; gap:6px;">
+              <span style="width:10px;height:10px;background:#16a34a;border-radius:50%;display:inline-block;"></span>Paid
+            </span>
+            <span style="font-family:'DM Mono',monospace;">€{{ "%.2f"|format(paid_total) }}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <span style="display:flex; align-items:center; gap:6px;">
+              <span style="width:10px;height:10px;background:#dc2626;border-radius:50%;display:inline-block;"></span>Unpaid/Pending
+            </span>
+            <span style="font-family:'DM Mono',monospace;">€{{ "%.2f"|format(unpaid_total) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>VAT Summary</h2></div>
+      <div class="card-body">
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">
+          Total VAT collected in {{ year }} to be remitted to Finanzamt
+        </div>
+        <div style="font-size:26px; font-weight:700; font-family:'DM Mono',monospace; color:var(--accent);">
+          €{{ "%.2f"|format(total_vat) }}
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">Umsatzsteuer (MwSt.)</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Monthly breakdown table -->
+<div class="card" style="margin-top: 20px;">
+  <div class="card-header"><h2>Monthly Breakdown — {{ year }}</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align:right;">Invoices</th>
+          <th style="text-align:right;">Net Revenue</th>
+          <th style="text-align:right;">VAT</th>
+          <th style="text-align:right;">Gross Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set months = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+        {% for i in range(1, 13) %}
+        {% set m = monthly[i] %}
+        <tr {% if m.count == 0 %}style="opacity:0.45;"{% endif %}>
+          <td style="font-weight:500;">{{ months[i-1] }}</td>
+          <td style="text-align:right; color:var(--text-muted);">{{ m.count }}</td>
+          <td style="text-align:right;" class="td-mono">€{{ "%.2f"|format(m.revenue) }}</td>
+          <td style="text-align:right;" class="td-mono" style="color:var(--text-muted);">€{{ "%.2f"|format(m.vat) }}</td>
+          <td style="text-align:right;" class="td-mono" style="font-weight:600;">€{{ "%.2f"|format(m.revenue + m.vat) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--bg); font-weight:700; border-top:2px solid var(--border);">
+          <td>Total {{ year }}</td>
+          <td style="text-align:right; font-family:'DM Mono',monospace;">{{ paid_count + unpaid_count }}</td>
+          <td style="text-align:right; font-family:'DM Mono',monospace;">€{{ "%.2f"|format(total_revenue) }}</td>
+          <td style="text-align:right; font-family:'DM Mono',monospace;">€{{ "%.2f"|format(total_vat) }}</td>
+          <td style="text-align:right; font-family:'DM Mono',monospace; color:var(--accent);">€{{ "%.2f"|format(total_gross) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const revenueData = [
+  {% for i in range(1, 13) %}{{ monthly[i].revenue + monthly[i].vat }}{% if not loop.last %},{% endif %}{% endfor %}
+];
+const netData = [
+  {% for i in range(1, 13) %}{{ monthly[i].revenue }}{% if not loop.last %},{% endif %}{% endfor %}
+];
+const vatData = [
+  {% for i in range(1, 13) %}{{ monthly[i].vat }}{% if not loop.last %},{% endif %}{% endfor %}
+];
+
+const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const textColor = isDark ? '#94a3b8' : '#64748b';
+const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+
+new Chart(document.getElementById('revenueChart'), {
+  type: 'bar',
+  data: {
+    labels: monthLabels,
+    datasets: [
+      {
+        label: 'Net Revenue',
+        data: netData,
+        backgroundColor: 'rgba(37,99,235,0.8)',
+        borderRadius: 5,
+        stack: 'stack'
+      },
+      {
+        label: 'VAT',
+        data: vatData,
+        backgroundColor: 'rgba(37,99,235,0.25)',
+        borderRadius: 5,
+        stack: 'stack'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: textColor, font: { family: 'DM Sans', size: 12 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` €${ctx.parsed.y.toFixed(2)}`
+        }
+      }
+    },
+    scales: {
+      x: { stacked: true, ticks: { color: textColor }, grid: { color: gridColor } },
+      y: { stacked: true, ticks: { color: textColor, callback: v => '€' + v.toLocaleString() }, grid: { color: gridColor } }
+    }
+  }
+});
+
+new Chart(document.getElementById('statusChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Paid', 'Outstanding'],
+    datasets: [{
+      data: [{{ paid_total }}, {{ unpaid_total }}],
+      backgroundColor: ['#16a34a', '#dc2626'],
+      borderWidth: 0,
+      hoverOffset: 4
+    }]
+  },
+  options: {
+    cutout: '72%',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` €${ctx.parsed.toFixed(2)}` } }
+    }
+  }
+});
+</script>
+{% endblock %}

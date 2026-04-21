@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% block topbar_title %}Customers{% endblock %}
+{% block topbar_actions %}
+  <a href="/customers/new" class="btn btn-primary btn-sm">+ Add Customer</a>
+{% endblock %}
+{% set active_nav = 'customers' %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Customers</h1>
+    <p>{{ customers|length }} customer{% if customers|length != 1 %}s{% endif %} in your workspace</p>
+  </div>
+</div>
+
+<form method="GET" class="search-bar">
+  <div class="search-input-wrap" style="flex:1;">
+    <input type="text" name="search" class="form-control search-input" placeholder="Search by name…" value="{{ search }}">
+  </div>
+  <button type="submit" class="btn btn-secondary">Search</button>
+  {% if search %}<a href="/customers" class="btn btn-secondary">Clear</a>{% endif %}
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    {% if customers %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>City</th>
+          <th>VAT ID</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td style="font-weight: 500;">{{ c.name }}</td>
+          <td style="color: var(--text-muted);">{{ c.email or '—' }}</td>
+          <td style="color: var(--text-muted);">{{ c.city or '—' }}{% if c.postal_code %}, {{ c.postal_code }}{% endif %}</td>
+          <td class="td-mono">{{ c.vat_id or '—' }}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <a href="/customers/{{ c.id }}/edit" class="btn btn-secondary btn-sm">Edit</a>
+              <form method="POST" action="/customers/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete {{ c.name }}?')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">👥</div>
+      <div class="empty-title">No customers yet</div>
+      <div class="empty-desc">{% if search %}No customers match "{{ search }}"{% else %}Add your first customer to start invoicing{% endif %}</div>
+      {% if not search %}<a href="/customers/new" class="btn btn-primary">Add Customer</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

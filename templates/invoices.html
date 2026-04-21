@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Invoices{% endblock %}
+{% block topbar_title %}Invoices{% endblock %}
+{% block topbar_actions %}
+  <a href="/invoices/new" class="btn btn-primary btn-sm">+ New Invoice</a>
+{% endblock %}
+{% set active_nav = 'invoices' %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Invoices</h1>
+    <p>{{ invoices|length }} invoice{% if invoices|length != 1 %}s{% endif %} found</p>
+  </div>
+</div>
+
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+  <div class="filter-tabs">
+    <a href="/invoices" class="filter-tab {% if not status_filter %}active{% endif %}">All</a>
+    <a href="/invoices?status=paid" class="filter-tab {% if status_filter == 'paid' %}active{% endif %}">Paid</a>
+    <a href="/invoices?status=pending" class="filter-tab {% if status_filter == 'pending' %}active{% endif %}">Pending</a>
+    <a href="/invoices?status=unpaid" class="filter-tab {% if status_filter == 'unpaid' %}active{% endif %}">Unpaid</a>
+  </div>
+  <form method="GET" style="display:flex; gap:8px; flex:1;">
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+    <input type="text" name="search" class="form-control" style="max-width:280px;"
+      placeholder="Search by customer…" value="{{ search }}">
+    <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+    {% if search %}<a href="/invoices{% if status_filter %}?status={{ status_filter }}{% endif %}" class="btn btn-secondary btn-sm">✕</a>{% endif %}
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    {% if invoices %}
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice #</th>
+          <th>Customer</th>
+          <th>Issue Date</th>
+          <th>Due Date</th>
+          <th>Subtotal</th>
+          <th>VAT</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr>
+          <td class="td-mono" style="font-weight:500;">
+            <a href="/invoices/{{ inv.id }}" style="text-decoration:none; color:var(--accent);">{{ inv.invoice_number }}</a>
+          </td>
+          <td>{{ inv.customer.name }}</td>
+          <td style="color:var(--text-muted);">{{ inv.issue_date }}</td>
+          <td style="color:var(--text-muted);">{{ inv.due_date }}</td>
+          <td class="td-mono">€{{ "%.2f"|format(inv.subtotal) }}</td>
+          <td class="td-mono" style="color:var(--text-muted);">€{{ "%.2f"|format(inv.vat_amount) }}</td>
+          <td class="td-mono" style="font-weight:600;">€{{ "%.2f"|format(inv.total) }}</td>
+          <td><span class="badge badge-{{ inv.status }}">{{ inv.status|title }}</span></td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <a href="/invoices/{{ inv.id }}" class="btn btn-secondary btn-sm">View</a>
+              <a href="/invoices/{{ inv.id }}/pdf" class="btn btn-secondary btn-sm">PDF</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🧾</div>
+      <div class="empty-title">No invoices found</div>
+      <div class="empty-desc">
+        {% if search or status_filter %}No invoices match your current filters{% else %}Create your first invoice to get started{% endif %}
+      </div>
+      {% if not search and not status_filter %}
+        <a href="/invoices/new" class="btn btn-primary">Create Invoice</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

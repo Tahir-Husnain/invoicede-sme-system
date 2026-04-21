@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}New Invoice{% endblock %}
+{% block topbar_title %}New Invoice{% endblock %}
+{% block topbar_actions %}
+  <a href="/invoices" class="btn btn-secondary btn-sm">← Back</a>
+{% endblock %}
+{% set active_nav = 'invoices' %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Create Invoice</h1>
+    <p>Fill in the details below to generate a new invoice</p>
+  </div>
+</div>
+
+{% if not customers %}
+<div class="alert alert-danger">
+  You need to <a href="/customers/new" style="color:var(--danger); font-weight:600;">add a customer</a> before creating an invoice.
+</div>
+{% else %}
+
+<form method="POST" action="/invoices/new" id="invoice-form">
+  <input type="hidden" name="items_json" id="items_json">
+
+  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start;">
+    <!-- Left column -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+
+      <!-- Invoice Details Card -->
+      <div class="card">
+        <div class="card-header"><h2>Invoice Details</h2></div>
+        <div class="card-body">
+          <div class="form-row cols-2">
+            <div class="form-group">
+              <label class="form-label">Invoice Number</label>
+              <input type="text" name="invoice_number" class="form-control" value="{{ inv_number }}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Customer *</label>
+              <select name="customer_id" class="form-control" required>
+                {% for c in customers %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="form-row cols-2">
+            <div class="form-group">
+              <label class="form-label">Issue Date</label>
+              <input type="date" name="issue_date" class="form-control" value="{{ today }}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Due Date</label>
+              <input type="date" name="due_date" class="form-control" value="{{ due_date }}" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="tax_free" id="tax_free">
+              <span>Kleinunternehmerregelung §19 UStG (Tax-free / No VAT)</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes <span class="optional">(optional)</span></label>
+            <textarea name="notes" class="form-control" placeholder="Payment terms, bank details, or other notes…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Line Items Card -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Line Items</h2>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addItem()">+ Add Item</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <table style="width:100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background: var(--bg); border-bottom: 1px solid var(--border);">
+                <th style="padding: 10px 12px; text-align:left; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Description</th>
+                <th style="padding: 10px 8px; text-align:center; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; width:70px;">Qty</th>
+                <th style="padding: 10px 8px; text-align:right; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; width:100px;">Unit Price</th>
+                <th style="padding: 10px 8px; text-align:center; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; width:80px;" id="vat-col-header">VAT</th>
+                <th style="padding: 10px 8px; text-align:right; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; width:100px;">Total</th>
+                <th style="width:36px;"></th>
+              </tr>
+            </thead>
+            <tbody id="items-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Summary -->
+    <div>
+      <div class="card" style="position: sticky; top: 78px;">
+        <div class="card-header"><h2>Summary</h2></div>
+        <div class="card-body">
+          <div class="totals-box">
+            <div class="totals-row">
+              <span class="totals-label">Subtotal (net)</span>
+              <span class="totals-value" id="summary-subtotal">€0.00</span>
+            </div>
+            <div id="vat-breakdown"></div>
+            <div class="totals-row total-grand">
+              <span>Total</span>
+              <span class="totals-value" id="summary-total">€0.00</span>
+            </div>
+          </div>
+          <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+            <button type="submit" class="btn btn-primary" style="justify-content:center;">
+              Create Invoice
+            </button>
+            <a href="/invoices" class="btn btn-secondary" style="justify-content:center; text-align:center;">Cancel</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<style>
+.item-row td { padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.item-row:last-child td { border-bottom: none; }
+.item-input {
+  width: 100%; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+  background: var(--surface); color: var(--text); transition: border-color 0.15s;
+}
+.item-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.08); }
+.remove-btn {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 4px; line-height: 1;
+}
+.remove-btn:hover { background: var(--danger-bg); color: var(--danger); }
+</style>
+
+<script>
+let items = [];
+let taxFree = false;
+
+document.getElementById('tax_free').addEventListener('change', function() {
+  taxFree = this.checked;
+  document.getElementById('vat-col-header').style.opacity = taxFree ? '0.3' : '1';
+  renderItems();
+  recalc();
+});
+
+function fmtEur(n) {
+  return '€' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function addItem() {
+  items.push({ description: '', quantity: 1, unit_price: 0, vat_rate: '19' });
+  renderItems();
+  recalc();
+  const tbody = document.getElementById('items-tbody');
+  const lastRow = tbody.lastElementChild;
+  if (lastRow) lastRow.querySelector('input').focus();
+}
+
+function removeItem(idx) {
+  items.splice(idx, 1);
+  renderItems();
+  recalc();
+}
+
+function renderItems() {
+  const tbody = document.getElementById('items-tbody');
+  tbody.innerHTML = '';
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">No items yet — click "+ Add Item" to begin</td></tr>';
+    return;
+  }
+  items.forEach((item, idx) => {
+    const net = item.quantity * item.unit_price;
+    const vatRate = taxFree ? 0 : parseFloat(item.vat_rate) / 100;
+    const vatAmt = net * vatRate;
+    const total = net + vatAmt;
+    const tr = document.createElement('tr');
+    tr.className = 'item-row';
+    tr.innerHTML = `
+      <td style="padding-left:12px;">
+        <input class="item-input" type="text" placeholder="Service or product description"
+          value="${item.description}" oninput="items[${idx}].description=this.value">
+      </td>
+      <td>
+        <input class="item-input" type="number" min="0.01" step="0.01" style="text-align:center; width:64px;"
+          value="${item.quantity}" oninput="items[${idx}].quantity=parseFloat(this.value)||0; recalc(); updateRowTotal(${idx})">
+      </td>
+      <td>
+        <input class="item-input" type="number" min="0" step="0.01" style="text-align:right; width:90px;"
+          value="${item.unit_price}" oninput="items[${idx}].unit_price=parseFloat(this.value)||0; recalc(); updateRowTotal(${idx})">
+      </td>
+      <td>
+        <select class="item-input" style="width:72px; ${taxFree ? 'opacity:0.3; pointer-events:none;' : ''}"
+          onchange="items[${idx}].vat_rate=this.value; recalc(); updateRowTotal(${idx})">
+          <option value="19" ${item.vat_rate==='19'?'selected':''}>19%</option>
+          <option value="7" ${item.vat_rate==='7'?'selected':''}>7%</option>
+          <option value="0" ${item.vat_rate==='0'?'selected':''}>0%</option>
+        </select>
+      </td>
+      <td style="text-align:right; font-family:'DM Mono',monospace; font-size:12.5px; font-weight:500; padding-right:8px;" id="row-total-${idx}">
+        ${fmtEur(total)}
+      </td>
+      <td style="padding-right:8px;">
+        <button type="button" class="remove-btn" onclick="removeItem(${idx})">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateRowTotal(idx) {
+  const item = items[idx];
+  const net = item.quantity * item.unit_price;
+  const vatRate = taxFree ? 0 : parseFloat(item.vat_rate) / 100;
+  const total = net + net * vatRate;
+  const el = document.getElementById(`row-total-${idx}`);
+  if (el) el.textContent = fmtEur(total);
+}
+
+function recalc() {
+  let subtotal = 0;
+  const vatByRate = {};
+  items.forEach(item => {
+    const net = item.quantity * item.unit_price;
+    subtotal += net;
+    const r = taxFree ? '0' : item.vat_rate;
+    const vatAmt = net * (parseFloat(r) / 100);
+    vatByRate[r] = (vatByRate[r] || 0) + vatAmt;
+  });
+  const totalVat = Object.values(vatByRate).reduce((a, b) => a + b, 0);
+  const grand = subtotal + totalVat;
+
+  document.getElementById('summary-subtotal').textContent = fmtEur(subtotal);
+  document.getElementById('summary-total').textContent = fmtEur(grand);
+
+  const breakdown = document.getElementById('vat-breakdown');
+  breakdown.innerHTML = '';
+  if (taxFree) {
+    breakdown.innerHTML = '<div class="totals-row"><span class="totals-label" style="font-size:12px;">§19 UStG — No VAT</span><span class="totals-value">€0.00</span></div>';
+  } else {
+    Object.entries(vatByRate).sort().forEach(([rate, amt]) => {
+      breakdown.innerHTML += `<div class="totals-row"><span class="totals-label">MwSt. ${rate}%</span><span class="totals-value">${fmtEur(amt)}</span></div>`;
+    });
+  }
+}
+
+document.getElementById('invoice-form').addEventListener('submit', function(e) {
+  if (items.length === 0) {
+    e.preventDefault();
+    alert('Please add at least one line item.');
+    return;
+  }
+  document.getElementById('items_json').value = JSON.stringify(items);
+});
+
+// Start with one empty item
+addItem();
+</script>
+{% endif %}
+{% endblock %}

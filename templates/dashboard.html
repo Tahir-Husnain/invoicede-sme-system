@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+{% block topbar_actions %}
+  <a href="/invoices/new" class="btn btn-primary btn-sm">+ New Invoice</a>
+{% endblock %}
+
+{% set active_nav = 'dashboard' %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Good day, {{ user.full_name.split()[0] }} 👋</h1>
+    <p>Here's what's happening with {{ user.company_name }}</p>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card stat-accent">
+    <div class="stat-label">Total Invoices</div>
+    <div class="stat-value">{{ total_invoices }}</div>
+    <div class="stat-sub">{{ customers_count }} customers</div>
+  </div>
+  <div class="stat-card stat-success">
+    <div class="stat-label">Revenue Collected</div>
+    <div class="stat-value">€{{ "%.0f"|format(total_revenue) }}</div>
+    <div class="stat-sub">{{ paid_invoices }} paid invoices</div>
+  </div>
+  <div class="stat-card stat-warning">
+    <div class="stat-label">Outstanding</div>
+    <div class="stat-value">€{{ "%.0f"|format(outstanding) }}</div>
+    <div class="stat-sub">{{ unpaid_invoices + pending_invoices }} open</div>
+  </div>
+  <div class="stat-card stat-danger">
+    <div class="stat-label">VAT Collected</div>
+    <div class="stat-value">€{{ "%.0f"|format(total_vat) }}</div>
+    <div class="stat-sub">On paid invoices</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+  <div class="card">
+    <div class="card-header">
+      <h2>Recent Invoices</h2>
+      <a href="/invoices" class="btn btn-secondary btn-sm">View all</a>
+    </div>
+    <div class="table-wrap">
+      {% if recent_invoices %}
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in recent_invoices %}
+          <tr onclick="location.href='/invoices/{{ inv.id }}'" style="cursor:pointer;">
+            <td class="td-mono">{{ inv.invoice_number }}</td>
+            <td>{{ inv.customer.name }}</td>
+            <td style="color: var(--text-muted);">{{ inv.issue_date }}</td>
+            <td class="td-mono" style="font-weight:500;">€{{ "%.2f"|format(inv.total) }}</td>
+            <td><span class="badge badge-{{ inv.status }}">{{ inv.status|title }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">📄</div>
+        <div class="empty-title">No invoices yet</div>
+        <div class="empty-desc">Create your first invoice to get started</div>
+        <a href="/invoices/new" class="btn btn-primary">Create Invoice</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div class="card">
+      <div class="card-header"><h2>Payment Status</h2></div>
+      <div class="card-body">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg); border-radius: 7px;">
+            <span style="font-size: 13px; color: var(--text-muted);">Paid</span>
+            <span class="badge badge-paid">{{ paid_invoices }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg); border-radius: 7px;">
+            <span style="font-size: 13px; color: var(--text-muted);">Pending</span>
+            <span class="badge badge-pending">{{ pending_invoices }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg); border-radius: 7px;">
+            <span style="font-size: 13px; color: var(--text-muted);">Unpaid</span>
+            <span class="badge badge-unpaid">{{ unpaid_invoices }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>This Month</h2></div>
+      <div class="card-body">
+        <div class="stat-value" style="font-size:22px; color: var(--accent);">€{{ "%.2f"|format(monthly_revenue) }}</div>
+        <div class="stat-sub" style="margin-top:4px;">Total billed this month</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Quick Actions</h2></div>
+      <div class="card-body" style="display: flex; flex-direction: column; gap: 8px;">
+        <a href="/invoices/new" class="btn btn-primary" style="justify-content: center;">+ New Invoice</a>
+        <a href="/customers/new" class="btn btn-secondary" style="justify-content: center;">+ Add Customer</a>
+        <a href="/reports/export/csv" class="btn btn-secondary" style="justify-content: center;">↓ Export CSV</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
